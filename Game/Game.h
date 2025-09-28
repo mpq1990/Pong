@@ -33,11 +33,13 @@ private:
     SDL_Renderer* mRenderer{ nullptr };
 
     // Game state
-    Vector2 mPaddlePos{};
+    Vector2 mLeftPaddlePos{};
+    Vector2 mRightPaddlePos{};
     Vector2 mBallPos{};
     Vector2 mBallVelocity{ -200.0f, 235.0f };
 
     bool    mIsRunning{ true };
     Uint64  mTicksCount{ 0 };  
-    int     mPaddleDir{ 0 };    
+    int     mLeftPaddleDir{ 0 };   
+    int     mRightPaddleDir{ 0 };
 };
