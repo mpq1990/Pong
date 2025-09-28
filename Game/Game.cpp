@@ -1,149 +1,200 @@
 #include "Game.h"
-#include <SDL3/SDL.h>
 
-static constexpr int thickness = 15;
-static constexpr float paddelHeight = 100.0f;
+Game::Game() noexcept = default;
 
-Game::Game() :mWindow{nullptr }, mRenderer{ nullptr }, mIsRunning{ true } {}
+bool Game::Initialize() noexcept {
+    if (!SDL_Init(SDL_INIT_VIDEO)) {
+        SDL_Log("Unable to initialize SDL: %s", SDL_GetError());
+        return false;
+    }
 
-// Initialises the Game
-bool Game::Initialize() {
-	int sdlResult = SDL_Init(SDL_INIT_VIDEO);
-	if (!sdlResult) {
-		SDL_Log("Unable to initialize SDL: %s", SDL_GetError());
-		return false;
-	}
+    mWindow = SDL_CreateWindow("Game Programming in C++",
+        kScreenWidth, kScreenHeight, 0);
+    if (!mWindow) {
+        SDL_Log("Failed to create window: %s", SDL_GetError());
+        SDL_Quit();
+        return false;
+    }
 
-	mWindow = SDL_CreateWindow("Game Programming in C++", 1024, 768, 0);
-	if (!mWindow) {
-		SDL_Log("Failed to create windows: %s", SDL_GetError());
-		return false;
-	}
+    mRenderer = SDL_CreateRenderer(mWindow, nullptr);
+    if (!mRenderer) {
+        SDL_Log("Unable to create renderer: %s", SDL_GetError());
+        SDL_DestroyWindow(mWindow);
+        SDL_Quit();
+        return false;
+    }
 
-	mRenderer = SDL_CreateRenderer(mWindow, nullptr);
-	if (!mRenderer) {
-		SDL_Log("Unable to create renderer: %s", SDL_GetError());
-		return false;
-	}
+    // Enable vsync if possible (SDL3: 0 = success, -1 = failure)
+    if (!SDL_SetRenderVSync(mRenderer, 1)) {
+        SDL_Log("Warning: VSync not supported: %s", SDL_GetError());
+    }
 
-	int vSync = SDL_SetRenderVSync(mRenderer, 1); // can inline, but for readability its fine for now
-	if (!vSync) {
-		SDL_Log("Warning: VSync not supported: %s", SDL_GetError());
+    // Initial positions (same as your original)
+    mPaddlePos = { 10.0f, static_cast<float>(kScreenHeight) / 2.0f };
+    mBallPos = { static_cast<float>(kScreenWidth) / 2.0f,
+                   static_cast<float>(kScreenHeight) / 2.0f };
 
-	}
+    mIsRunning = true;
+    mPaddleDir = 0;
+    mTicksCount = SDL_GetTicks(); // Uint64
 
-	mPaddlePos.x = 10.0f;
-	mPaddlePos.y = 768.0f / 2.0f;
-	mBallPos.x = 1024.0f / 2.0f;
-	mBallPos.y = 768.0f / 2.0f;
-
-
-	mIsRunning = true;
-	return true;
+    return true;
 }
 
-
-// Terminates the Game
-void Game::Shutdown() {
-	SDL_DestroyRenderer(mRenderer);
-	SDL_DestroyWindow(mWindow);
-	SDL_Quit();
+void Game::Shutdown() noexcept {
+    if (mRenderer) {
+        SDL_DestroyRenderer(mRenderer);
+        mRenderer = nullptr;
+    }
+    if (mWindow) {
+        SDL_DestroyWindow(mWindow);
+        mWindow = nullptr;
+    }
+    SDL_Quit();
 }
 
-// Main Game Loop
-void Game::RunLoop() {
-	while (mIsRunning) {
-		ProcessInput();
-		UpdateGame();
-		GenerateOutput();
-	}
+// ---------------------------
+// main game loop
+// ---------------------------
+void Game::RunLoop() noexcept {
+    while (mIsRunning) {
+        ProcessInput();
+        UpdateGame();
+        GenerateOutput();
+    }
 }
 
-void Game::ProcessInput() {
-	SDL_Event event;
-	while (SDL_PollEvent(&event)) {
-		switch (event.type) {
-		case SDL_EVENT_QUIT:
-			mIsRunning = false;
-			break;
-		}
-	}
+// ---------------------------
+// input
+// ---------------------------
+void Game::ProcessInput() noexcept {
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+        if (event.type == SDL_EVENT_QUIT) {
+            mIsRunning = false;
+        }
+    }
 
-	const bool* state = SDL_GetKeyboardState(NULL);
-	if (state[SDL_SCANCODE_ESCAPE]) {
-		mIsRunning = false;
-	}
-};
+    const bool* state = SDL_GetKeyboardState(nullptr);
 
-void Game::UpdateGame() {};
+    if (state[SDL_SCANCODE_ESCAPE]) {
+        mIsRunning = false;
+    }
 
-void Game::GenerateOutput() {
-	// Set draw color to blue
-	SDL_SetRenderDrawColor(mRenderer, 0, 0, 255, 255);
+    mPaddleDir = 0;
+    if (state[SDL_SCANCODE_W]) mPaddleDir -= 1;
+    if (state[SDL_SCANCODE_S]) mPaddleDir += 1;
+}
 
-	// clear back buffer
-	SDL_RenderClear(mRenderer);
+// ---------------------------
+// update
+// ---------------------------
+void Game::UpdateGame() noexcept {
+    // Busy-wait cap to ~60 FPS (kept to preserve your behavior)
+    while (SDL_GetTicks() < mTicksCount + kFrameMS) { /* spin */ }
 
-	// draw walls
-	SDL_SetRenderDrawColor(mRenderer, 255, 255, 255, 255);
+    float deltaTime = static_cast<float>(SDL_GetTicks() - mTicksCount) / 1000.0f;
+    if (deltaTime > kMaxDelta) {
+        deltaTime = kMaxDelta;
+    }
 
-	// top wall
-	SDL_FRect wall{
-		0,
-		0,
-		1024,
-		thickness
-	};
+    // Move paddle (unchanged logic)
+    if (mPaddleDir != 0) {
+        mPaddlePos.y += mPaddleDir * kPaddleSpeed * deltaTime;
 
-	SDL_RenderFillRect(mRenderer, &wall);
+        const float topLimit =
+            (kPaddleHeight / 2.0f) + static_cast<float>(kThickness);
+        const float bottomLimit =
+            static_cast<float>(kScreenHeight - kThickness) - (kPaddleHeight / 2.0f);
 
-	//bottom wall
-	wall.y = 768 - thickness;
-	SDL_RenderFillRect(mRenderer, &wall);
+        if (mPaddlePos.y < topLimit) {
+            mPaddlePos.y = topLimit;
+        }
+        else if (mPaddlePos.y > bottomLimit) {
+            mPaddlePos.y = bottomLimit;
+        }
+    }
 
-	// right wall
-	wall.x = 1024 - thickness;
-	wall.y = 0;
-	wall.h = 1024;
-	wall.w = thickness;
-	SDL_RenderFillRect(mRenderer, &wall);
+    // Move ball
+    mBallPos.x += mBallVelocity.x * deltaTime;
+    mBallPos.y += mBallVelocity.y * deltaTime;
 
-	// draw paddel
-	SDL_FRect paddel{
-		mPaddlePos.x - (thickness / 2),
-		mPaddlePos.y - (paddelHeight / 2),
-		thickness,
-		paddelHeight
-	};
-	SDL_RenderFillRect(mRenderer, &paddel);
+    // Top wall
+    if (mBallPos.y <= static_cast<float>(kThickness) && mBallVelocity.y < 0.0f) {
+        mBallVelocity.y *= -1.0f;
+    }
+    // Bottom wall
+    if (mBallPos.y >= static_cast<float>(kScreenHeight - kThickness) && mBallVelocity.y > 0.0f) {
+        mBallVelocity.y *= -1.0f;
+    }
+    // Right wall
+    if (mBallPos.x >= static_cast<float>(kScreenWidth - kThickness) && mBallVelocity.x > 0.0f) {
+        mBallVelocity.x *= -1.0f;
+    }
 
-	// draw ball
-	SDL_FRect ball{
-		mBallPos.x - (thickness / 2),
-		mBallPos.y - (thickness / 2),
-		thickness,
-		thickness
-	};
-	SDL_RenderFillRect(mRenderer, &ball);
+    // Paddle collision
+    float diff = mPaddlePos.y - mBallPos.y;
+    diff = (diff > 0.0f) ? diff : -diff;
+    if (diff <= (kPaddleHeight / 2.0f) &&
+        mBallVelocity.x < 0.0f &&
+        mBallPos.x <= 25.0f && mBallPos.x >= 20.0f) {
+        mBallVelocity.x *= -1.0f;
+    }
+    else if (mBallPos.x <= 0.0f) {
+        mIsRunning = false; // fixed stray comma from original
+    }
 
-		// Draw paddle
-	//SDL_FRect paddle{
-	//	static_cast<int>(mPaddlePos.x),
-	//	static_cast<int>(mPaddlePos.y - paddelHeight / 2),
-	//	thickness,
-	//	static_cast<int>(paddelHeight)
-	//};
-	//SDL_RenderFillRect(mRenderer, &paddle);
+    mTicksCount = SDL_GetTicks(); // Uint64
+}
 
-	//// Draw ball
-	//SDL_FRect ball{
-	//	static_cast<int>(mBallPos.x - thickness / 2),
-	//	static_cast<int>(mBallPos.y - thickness / 2),
-	//	thickness,
-	//	thickness
-	//};
-	//SDL_RenderFillRect(mRenderer, &ball);
+// ---------------------------
+// render
+// ---------------------------
+void Game::GenerateOutput() noexcept {
+    // Clear (blue)
+    SDL_SetRenderDrawColor(mRenderer, 0, 0, 255, 255);
+    SDL_RenderClear(mRenderer);
 
-	// swap front buffer and back buffer
-	SDL_RenderPresent(mRenderer);
-};
+    // Draw color (white)
+    SDL_SetRenderDrawColor(mRenderer, 255, 255, 255, 255);
+
+    // Top wall
+    SDL_FRect wall{
+        0.0f, 0.0f,
+        static_cast<float>(kScreenWidth),
+        static_cast<float>(kThickness)
+    };
+    SDL_RenderFillRect(mRenderer, &wall);
+
+    // Bottom wall
+    wall.y = static_cast<float>(kScreenHeight - kThickness);
+    SDL_RenderFillRect(mRenderer, &wall);
+
+    // Right wall (kept your original wall.h = 1024.0f on purpose)
+    wall.x = static_cast<float>(kScreenWidth - kThickness);
+    wall.y = 0.0f;
+    wall.h = 1024.0f;
+    wall.w = static_cast<float>(kThickness);
+    SDL_RenderFillRect(mRenderer, &wall);
+
+    // Paddle
+    SDL_FRect paddle{
+        mPaddlePos.x - (static_cast<float>(kThickness) / 2.0f),
+        mPaddlePos.y - (kPaddleHeight / 2.0f),
+        static_cast<float>(kThickness),
+        kPaddleHeight
+    };
+    SDL_RenderFillRect(mRenderer, &paddle);
+
+    // Ball
+    SDL_FRect ball{
+        mBallPos.x - (static_cast<float>(kThickness) / 2.0f),
+        mBallPos.y - (static_cast<float>(kThickness) / 2.0f),
+        static_cast<float>(kThickness),
+        static_cast<float>(kThickness)
+    };
+    SDL_RenderFillRect(mRenderer, &ball);
+
+    // Present
+    SDL_RenderPresent(mRenderer);
+}
