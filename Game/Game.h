@@ -18,6 +18,8 @@ private:
     void ProcessInput() noexcept;
     void UpdateGame() noexcept;
     void GenerateOutput() noexcept;
+    void MovePaddle(int paddleDir, Vector2& paddlePos, float deltaTime) noexcept;
+    bool CheckPaddleCollision(const Vector2& paddlePos, float diff, bool isLeftPaddle) noexcept;
 
     // Constants (names only — gameplay/values unchanged)
     static constexpr int    kScreenWidth = 1024;

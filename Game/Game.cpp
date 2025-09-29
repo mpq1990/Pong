@@ -91,6 +91,24 @@ void Game::ProcessInput() noexcept {
     if (state[SDL_SCANCODE_K]) mRightPaddleDir += 1;
 }
 
+void Game::MovePaddle(int paddleDir, Vector2& paddlePos, float deltaTime) noexcept {
+    if (paddleDir != 0) {
+        paddlePos.y += paddleDir * kPaddleSpeed * deltaTime;
+
+        const float topLimit =
+            (kPaddleHeight / 2.0f) + static_cast<float>(kThickness);
+        const float bottomLimit =
+            static_cast<float>(kScreenHeight - kThickness) - (kPaddleHeight / 2.0f);
+
+        if (paddlePos.y < topLimit) {
+            paddlePos.y = topLimit;
+        }
+        else if (paddlePos.y > bottomLimit) {
+            paddlePos.y = bottomLimit;
+        }
+    }
+}
+
 // ---------------------------
 // update
 // ---------------------------
@@ -104,38 +122,10 @@ void Game::UpdateGame() noexcept {
     }
 
     // Move Left paddle 
-    if (mLeftPaddleDir != 0) {
-        mLeftPaddlePos.y += mLeftPaddleDir * kPaddleSpeed * deltaTime;
-
-        const float topLimit =
-            (kPaddleHeight / 2.0f) + static_cast<float>(kThickness);
-        const float bottomLimit =
-            static_cast<float>(kScreenHeight - kThickness) - (kPaddleHeight / 2.0f);
-
-        if (mLeftPaddlePos.y < topLimit) {
-            mLeftPaddlePos.y = topLimit;
-        }
-        else if (mLeftPaddlePos.y > bottomLimit) {
-            mLeftPaddlePos.y = bottomLimit;
-        }
-    }
+    MovePaddle(mLeftPaddleDir, mLeftPaddlePos, deltaTime);
 
     // Move Right paddle
-    if (mRightPaddleDir != 0) {
-        mRightPaddlePos.y += mRightPaddleDir * kPaddleSpeed * deltaTime;
-
-        const float topLimit =
-            (kPaddleHeight / 2.0f) + static_cast<float>(kThickness);
-        const float bottomLimit =
-            static_cast<float>(kScreenHeight - kThickness) - (kPaddleHeight / 2.0f);
-
-        if (mRightPaddlePos.y < topLimit) {
-            mRightPaddlePos.y = topLimit;
-        }
-        else if (mRightPaddlePos.y > bottomLimit) {
-            mRightPaddlePos.y = bottomLimit;
-        }
-    }
+    MovePaddle(mRightPaddleDir, mRightPaddlePos, deltaTime);
 
     // Move ball
     mBallPos.x += mBallVelocity.x * deltaTime;
@@ -156,31 +146,46 @@ void Game::UpdateGame() noexcept {
     //    mBallVelocity.x *= -1.0f;
     //}
 
-    // Left Paddle collision
-    float diff = mLeftPaddlePos.y - mBallPos.y;
-    diff = (diff > 0.0f) ? diff : -diff;
-    if (diff <= (kPaddleHeight / 2.0f) &&
-        mBallVelocity.x < 0.0f &&
-        mBallPos.x <= 25.0f && mBallPos.x >= 20.0f) {
-        mBallVelocity.x *= -1.0f;
-    }
-    else if (mBallPos.x <= 0.0f) {
-        mIsRunning = false; 
-    }
+     //Left Paddle collision
+     float diff = mLeftPaddlePos.y - mBallPos.y;
+     diff = (diff > 0.0f) ? diff : -diff;
+     if (!CheckPaddleCollision(mLeftPaddlePos, diff, true) &&
+         mBallPos.x <= 0.0f) {
+         mIsRunning = false;
+     }
 
     // Right Paddle collistion
-    float rightDiff = mRightPaddlePos.y - mBallPos.y;
-    rightDiff = (rightDiff > 0.0f) ? rightDiff : -rightDiff;
-    if (rightDiff <= (kPaddleHeight / 2.0f) &&
-        mBallVelocity.x > 0.0f &&
-        mBallPos.x >= (kScreenWidth - 25.0f) && mBallPos.x <= (kScreenWidth - 20.0f)) {
-        mBallVelocity.x *= -1.0f;
-    }
-    else if (mBallPos.x >= kScreenWidth) {
-        mIsRunning = false;
-    }
+     float rightDiff = mRightPaddlePos.y - mBallPos.y;
+     rightDiff = (rightDiff > 0.0f) ? rightDiff : -rightDiff;
+     if (!CheckPaddleCollision(mRightPaddlePos, rightDiff, false) &&
+         mBallPos.x >= kScreenWidth) {
+         mIsRunning = false;
+     }
 
     mTicksCount = SDL_GetTicks(); // Uint64
+}
+
+bool Game::CheckPaddleCollision(const Vector2& paddlePos,
+    float diff,
+    bool isLeftPaddle) noexcept {
+    if (diff <= (kPaddleHeight / 2.0f)) {
+        if (isLeftPaddle) {
+            if (mBallVelocity.x < 0.0f &&
+                mBallPos.x <= 25.0f && mBallPos.x >= 20.0f) {
+                mBallVelocity.x *= -1.0f;
+                return true;
+            }
+        }
+        else { // right paddle
+            if (mBallVelocity.x > 0.0f &&
+                mBallPos.x >= (kScreenWidth - 25.0f) &&
+                mBallPos.x <= (kScreenWidth - 20.0f)) {
+                mBallVelocity.x *= -1.0f;
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 // ---------------------------
