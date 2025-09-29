@@ -5,12 +5,14 @@ Inspired by *"Game Programming in C++"* (Sanjay Madhav).
 
 ## Features
 - Basic game loop (Init → Run → Shutdown)
-- Paddle movement & ball physics
-- Collision with walls and paddle
+- Two paddles (player vs player)
+- Multiple balls (using `std::array`)
+- Collision with walls and paddles
 - Simple rendering with SDL3
 
 ## Controls
-- **W / S** → Move paddle  
+- **W / S** → Move left paddle  
+- **I / K** → Move right paddle  
 - **ESC** → Quit  
 
 ## Build
