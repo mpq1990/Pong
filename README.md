@@ -21,3 +21,8 @@ Make sure SDL3 is installed, then for example on Linux:
 ```bash
 g++ -std=c++20 main.cpp Game.cpp -lSDL3 -o pong
 ./pong
+
+## Notes
+- Balls are stored in a `std::array` with fixed size.  
+- This avoids dynamic heap allocations that `std::vector` would use.  
+- If the number of balls needed to be dynamic, `std::vector` would be the right choice.
