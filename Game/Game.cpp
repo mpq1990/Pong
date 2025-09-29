@@ -32,8 +32,23 @@ bool Game::Initialize() noexcept {
     // Initial positions
     mLeftPaddlePos = { 10.0f, static_cast<float>(kScreenHeight) / 2.0f };
     mRightPaddlePos = { 1024.0f - 10.0f, static_cast<float>(kScreenHeight) / 2.0f };
-    mBallPos = { static_cast<float>(kScreenWidth) / 2.0f,
-                   static_cast<float>(kScreenHeight) / 2.0f };
+
+
+
+    for (size_t i = 0; i < mBalls.size(); ++i) {
+        mBalls[i].pos = {
+            kScreenWidth * 0.5f,
+            kScreenHeight * 0.5f + static_cast<float>(i) * 50.0f // stagger vertically
+        };
+
+        mBalls[i].vel = {
+            -200.0f + static_cast<float>(i) * 50.0f,  // each ball a bit faster/slower
+            235.0f
+        };
+    }
+
+    //mBallPos = { static_cast<float>(kScreenWidth) / 2.0f,
+    //               static_cast<float>(kScreenHeight) / 2.0f };
 
     mIsRunning = true;
     mLeftPaddleDir = 0;
@@ -128,39 +143,37 @@ void Game::UpdateGame() noexcept {
     MovePaddle(mRightPaddleDir, mRightPaddlePos, deltaTime);
 
     // Move ball
-    mBallPos.x += mBallVelocity.x * deltaTime;
-    mBallPos.y += mBallVelocity.y * deltaTime;
+    for (auto& b : mBalls) {
+        b.pos.x += b.vel.x * deltaTime;
+        b.pos.y += b.vel.y * deltaTime;
 
-    // Top wall
-    if (mBallPos.y <= static_cast<float>(kThickness) && mBallVelocity.y < 0.0f) {
-        mBallVelocity.y *= -1.0f;
+        // top/bottom
+        if (b.pos.y <= kThickness && b.vel.y < 0.0f) b.vel.y *= -1.0f;
+        if (b.pos.y >= (kScreenHeight - kThickness) && b.vel.y > 0.0f) b.vel.y *= -1.0f;
+
+        // left paddle (your original ranges)
+        float diffL = std::abs(mLeftPaddlePos.y - b.pos.y);
+        if (diffL <= (kPaddleHeight / 2.0f) &&
+            b.vel.x < 0.0f &&
+            b.pos.x <= 25.0f && b.pos.x >= 20.0f) {
+            b.vel.x *= -1.0f;
+        }
+
+        // right paddle
+        float diffR = std::abs(mRightPaddlePos.y - b.pos.y);
+        if (diffR <= (kPaddleHeight / 2.0f) &&
+            b.vel.x > 0.0f &&
+            b.pos.x >= (kScreenWidth - 25.0f) && b.pos.x <= (kScreenWidth - 20.0f)) {
+            b.vel.x *= -1.0f;
+        }
     }
-    // Bottom wall
-    if (mBallPos.y >= static_cast<float>(kScreenHeight - kThickness) && mBallVelocity.y > 0.0f) {
-        mBallVelocity.y *= -1.0f;
+
+    for (auto& b : mBalls) {
+        if (b.pos.x <= 0.0f || b.pos.x >= kScreenWidth) {
+            mIsRunning = false;
+            break;
+        }
     }
-
-    // Commenting out for two players
-    // Right wall
-    //if (mBallPos.x >= static_cast<float>(kScreenWidth - kThickness) && mBallVelocity.x > 0.0f) {
-    //    mBallVelocity.x *= -1.0f;
-    //}
-
-     //Left Paddle collision
-     float diff = mLeftPaddlePos.y - mBallPos.y;
-     diff = (diff > 0.0f) ? diff : -diff;
-     if (!CheckPaddleCollision(mLeftPaddlePos, diff, true) &&
-         mBallPos.x <= 0.0f) {
-         mIsRunning = false;
-     }
-
-    // Right Paddle collistion
-     float rightDiff = mRightPaddlePos.y - mBallPos.y;
-     rightDiff = (rightDiff > 0.0f) ? rightDiff : -rightDiff;
-     if (!CheckPaddleCollision(mRightPaddlePos, rightDiff, false) &&
-         mBallPos.x >= kScreenWidth) {
-         mIsRunning = false;
-     }
 
     mTicksCount = SDL_GetTicks(); // Uint64
 }
@@ -238,13 +251,15 @@ void Game::GenerateOutput() noexcept {
     SDL_RenderFillRect(mRenderer, &rightPaddle);
 
     // Ball
-    SDL_FRect ball{
-        mBallPos.x - (static_cast<float>(kThickness) / 2.0f),
-        mBallPos.y - (static_cast<float>(kThickness) / 2.0f),
-        static_cast<float>(kThickness),
-        static_cast<float>(kThickness)
-    };
-    SDL_RenderFillRect(mRenderer, &ball);
+    for (const auto& b : mBalls) {
+        SDL_FRect ball{
+            b.pos.x - (kThickness * 0.5f),
+            b.pos.y - (kThickness * 0.5f),
+            static_cast<float>(kThickness),
+            static_cast<float>(kThickness)
+        };
+        SDL_RenderFillRect(mRenderer, &ball);
+    }
 
     // Present
     SDL_RenderPresent(mRenderer);

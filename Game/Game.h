@@ -1,9 +1,15 @@
 #pragma once
 #include <SDL3/SDL.h>
+#include <array>
 
 struct Vector2 {
     float x{};
     float y{};
+};
+
+struct Ball {
+    Vector2 pos;
+    Vector2 vel;
 };
 
 class Game {
@@ -29,6 +35,9 @@ private:
     static constexpr float  kPaddleSpeed = 300.0f;
     static constexpr float  kMaxDelta = 0.05f;
     static constexpr Uint64 kFrameMS = 16;   // match SDL_GetTicks() type
+    static constexpr size_t kBallCount = 3;
+
+    std::array<Ball, kBallCount> mBalls;
 
     // SDL resources
     SDL_Window* mWindow{ nullptr };
